@@ -406,9 +406,20 @@ exports.decompressBlocks = function decompressBlocks (src, dst) {
       break;
     }
 
-    // Decompress into blockBuf
-    dIndex = exports.decompressBlock(src, dst, sIndex, compSize, dIndex);
-    sIndex += compSize;
+    // Check if block is compressed
+    if ((compSize & bsUncompressed) !== 0) {
+      // Mask off the 'uncompressed' bit
+      compSize &= ~bsUncompressed;
+
+      // Copy uncompressed data into destination buffer.
+      for (var j = 0; j < compSize; j++) {
+        dst[dIndex++] = src[sIndex++];
+      }
+    } else {
+      // Decompress into blockBuf
+      dIndex = exports.decompressBlock(src, dst, sIndex, compSize, dIndex);
+      sIndex += compSize;
+    }
   }
 
   return dst;
