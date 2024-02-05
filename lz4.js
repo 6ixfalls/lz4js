@@ -411,7 +411,7 @@ exports.decompressBlocks = function decompressBlocks (src, dst) {
     sIndex += compSize;
   }
 
-  return dIndex;
+  return dst;
 }
 
 // Decompresses a frame of Lz4 data.
