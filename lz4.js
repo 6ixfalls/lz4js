@@ -31,6 +31,9 @@ var runMask = (1 << runBits) - 1;
 var blockBuf = makeBuffer(5 << 20);
 var hashTable = makeHashTable();
 
+// Frame constants.
+var magicNum = 0x184D2204;
+
 // Frame descriptor flags.
 var fdContentChksum = 0x4;
 var fdContentSize = 0x8;
@@ -132,6 +135,13 @@ exports.compressBound = function compressBound (n) {
 // Calculates an upper bound for lz4 decompression, by reading the data.
 exports.decompressBound = function decompressBound (src) {
   var sIndex = 0;
+
+  // Read magic number
+  if (util.readU32(src, sIndex) !== magicNum) {
+    throw new Error('invalid magic number');
+  }
+
+  sIndex += 4;
 
   // Read descriptor
   var descriptor = src[sIndex++];
@@ -380,11 +390,42 @@ exports.compressBlock = function compressBlock (src, dst, sIndex, sLength, hashT
   return dIndex;
 };
 
+// Decompresses actual Lz4 data for Roblox.
+exports.decompressBlocks = function decompressBlocks (src, dst) {
+  var sIndex = 0;
+  var dIndex = 0;
+
+  // Read blocks.
+  while (true) {
+    var compSize;
+
+    compSize = util.readU32(src, sIndex);
+    sIndex += 4;
+
+    if (compSize === 0) {
+      break;
+    }
+
+    // Decompress into blockBuf
+    dIndex = exports.decompressBlock(src, dst, sIndex, compSize, dIndex);
+    sIndex += compSize;
+  }
+
+  return dIndex;
+}
+
 // Decompresses a frame of Lz4 data.
 exports.decompressFrame = function decompressFrame (src, dst) {
   var useBlockSum, useContentSum, useContentSize, descriptor;
   var sIndex = 0;
   var dIndex = 0;
+
+  // Read magic number
+  if (util.readU32(src, sIndex) !== magicNum) {
+    throw new Error('invalid magic number');
+  }
+
+  sIndex += 4;
 
   // Read descriptor
   descriptor = src[sIndex++];
@@ -456,6 +497,10 @@ exports.decompressFrame = function decompressFrame (src, dst) {
 // Compresses data to an Lz4 frame.
 exports.compressFrame = function compressFrame (src, dst) {
   var dIndex = 0;
+
+  // Write magic number.
+  util.writeU32(dst, dIndex, magicNum);
+  dIndex += 4;
 
   // Descriptor flags.
   dst[dIndex++] = fdVersion;
